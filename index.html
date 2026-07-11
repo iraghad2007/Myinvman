@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام الدعوات الذكي</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --primary:#7c3aed;
+    --primary-dark:#5b21b6;
+    --bg:#f5f3ff;
+    --card:#ffffff;
+    --text:#1f2333;
+    --muted:#6b7280;
+    --danger:#dc2626;
+    --success:#16a34a;
+    --border:#e5e7eb;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI", Tahoma, Arial, sans-serif;
+    background:linear-gradient(180deg,var(--bg),#fff 60%);
+    color:var(--text);
+    min-height:100vh;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:24px 16px 60px;}
+  .center-wrap{max-width:480px;margin:40px auto;padding:0 16px;}
+  h1,h2,h3{margin:0 0 8px;}
+  h1{font-size:1.5rem;}
+  h2{font-size:1.2rem;}
+  p{margin:0 0 12px;color:var(--muted);}
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);
+  }
+  .header{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:20px;flex-wrap:wrap;gap:10px;
+  }
+  .brand{font-weight:700;font-size:1.2rem;color:var(--primary-dark);}
+  label{display:block;font-size:.85rem;margin-bottom:6px;color:var(--muted);}
+  input[type=text],input[type=password],input[type=email],input[type=date],input[type=time],input[type=tel],textarea{
+    width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;
+    font-size:1rem;margin-bottom:14px;background:#fff;color:var(--text);
+    font-family:inherit;
+  }
+  textarea{min-height:80px;resize:vertical;}
+  input:focus,textarea:focus{outline:none;border-color:var(--primary);}
+  button{
+    cursor:pointer;border:none;border-radius:10px;padding:11px 18px;
+    font-size:1rem;font-weight:600;font-family:inherit;
+    transition:transform .05s ease, opacity .15s ease;
+  }
+  button:active{transform:scale(.98);}
+  button:disabled{opacity:.55;cursor:not-allowed;}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover:not(:disabled){background:var(--primary-dark);}
+  .btn-outline{background:#fff;border:1px solid var(--primary);color:var(--primary);}
+  .btn-danger{background:#fff;border:1px solid var(--danger);color:var(--danger);}
+  .btn-success{background:var(--success);color:#fff;}
+  .btn-block{width:100%;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .row > *{flex:1;min-width:140px;}
+  .link-box{
+    display:flex;gap:8px;align-items:center;background:#f8f7ff;
+    border:1px dashed var(--primary);border-radius:10px;padding:8px 10px;margin-bottom:10px;
+    flex-wrap:wrap;
+  }
+  .link-box input{flex:1;border:none;background:transparent;margin:0;padding:4px;min-width:150px;}
+  .badge{
+    display:inline-block;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:600;
+  }
+  .badge-purple{background:#ede9fe;color:var(--primary-dark);}
+  .badge-green{background:#dcfce7;color:#166534;}
+  .badge-red{background:#fee2e2;color:#991b1b;}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;}
+  .stat-box{background:#f8f7ff;border-radius:12px;padding:14px;text-align:center;}
+  .stat-box .num{font-size:1.6rem;font-weight:800;color:var(--primary-dark);}
+  .stat-box .lbl{font-size:.8rem;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;}
+  th,td{text-align:right;padding:9px 8px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;}
+  .msg{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:.9rem;}
+  .msg-error{background:#fee2e2;color:#991b1b;}
+  .msg-success{background:#dcfce7;color:#166534;}
+  .invite-img{width:100%;border-radius:14px;margin-bottom:14px;display:block;box-shadow:0 4px 18px rgba(0,0,0,.12);}
+  .center-screen{
+    min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;
+  }
+  .event-list-item{border-bottom:1px solid var(--border);padding:14px 0;}
+  .event-list-item:last-child{border-bottom:none;}
+  .muted-small{font-size:.8rem;color:var(--muted);}
+  .spinner{
+    width:34px;height:34px;border:4px solid #ede9fe;border-top-color:var(--primary);
+    border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .file-input-wrap{
+    border:2px dashed var(--primary);border-radius:12px;padding:20px;text-align:center;margin-bottom:14px;background:#faf9ff;
+  }
+  .progress-bar{height:8px;background:#ede9fe;border-radius:999px;overflow:hidden;margin:10px 0;}
+  .progress-bar-fill{height:100%;background:var(--primary);width:0%;transition:width .2s ease;}
+  a{color:var(--primary-dark);}
+  footer.appfoot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ==========================================================
+   إعدادات الاتصال بـ Supabase - عدّل القيمتين التاليتين فقط
+   ========================================================== */
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const BUCKET = "invitations";
+const app = document.getElementById("app");
+
+/* ---------------- أدوات مساعدة عامة ---------------- */
+function esc(str){
+  const d = document.createElement("div");
+  d.innerText = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+function fmtDate(d){
+  if(!d) return "";
+  try{ return new Date(d).toLocaleDateString("ar-SA"); }catch(e){ return d; }
+}
+function copyText(text, btn){
+  navigator.clipboard.writeText(text).then(()=>{
+    const old = btn.innerText;
+    btn.innerText = "تم النسخ ✓";
+    setTimeout(()=>btn.innerText = old, 1500);
+  });
+}
+function baseUrl(){
+  return window.location.origin + window.location.pathname;
+}
+function msgHtml(type, text){
+  return `<div class="msg msg-${type}">${esc(text)}</div>`;
+}
+
+/* ---------------- التوجيه الرئيسي ---------------- */
+function router(){
+  const params = new URLSearchParams(window.location.search);
+  if(params.has("guest")) return renderGuestPage(params.get("guest"));
+  if(params.has("stats")) return renderStatsPage(params.get("stats"));
+  return renderAdminEntry();
+}
+
+/* ==========================================================
+   1) لوحة تحكم الإدارة
+   ========================================================== */
+async function renderAdminEntry(){
+  app.innerHTML = `<div class="center-screen"><div class="spinner"></div><p>جارِ التحميل...</p></div>`;
+  const { data: { session } } = await sb.auth.getSession();
+  if(session) renderAdminDashboard();
+  else renderAdminLogin();
+}
+
+function renderAdminLogin(){
+  app.innerHTML = `
+    <div class="center-wrap">
+      <div class="card">
+        <h1 class="brand">🔐 لوحة تحكم المدير</h1>
+        <p>سجّل الدخول لإدارة المناسبات والدعوات</p>
+        <div id="login-msg"></div>
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="login-email" placeholder="admin@example.com">
+        <label>كلمة المرور</label>
+        <input type="password" id="login-password" placeholder="••••••••">
+        <button class="btn-primary btn-block" id="login-btn">تسجيل الدخول</button>
+      </div>
+    </div>`;
+  document.getElementById("login-btn").onclick = async ()=>{
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
+    const msgEl = document.getElementById("login-msg");
+    const btn = document.getElementById("login-btn");
+    if(!email || !password){
+      msgEl.innerHTML = msgHtml("error", "الرجاء إدخال البريد وكلمة المرور");
+      return;
+    }
+    btn.disabled = true; btn.innerText = "جارِ الدخول...";
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    btn.disabled = false; btn.innerText = "تسجيل الدخول";
+    if(error){
+      msgEl.innerHTML = msgHtml("error", "بيانات الدخول غير صحيحة");
+    } else {
+      renderAdminDashboard();
+    }
+  };
+}
+
+async function renderAdminDashboard(){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="header">
+        <div class="brand">🎟️ لوحة تحكم الدعوات</div>
+        <button class="btn-outline" id="logout-btn">تسجيل الخروج</button>
+      </div>
+
+      <div class="card">
+        <h2>➕ إنشاء مناسبة جديدة</h2>
+        <div id="create-msg"></div>
+        <label>اسم المناسبة</label>
+        <input type="text" id="ev-name" placeholder="مثال: حفل زفاف سارة">
+        <label>وصف المناسبة</label>
+        <textarea id="ev-desc" placeholder="نص ترحيبي مختصر يظهر للضيوف"></textarea>
+        <div class="row">
+          <div>
+            <label>تاريخ المناسبة</label>
+            <input type="date" id="ev-date">
+          </div>
+          <div>
+            <label>وقت المناسبة</label>
+            <input type="time" id="ev-time">
+          </div>
+        </div>
+        <button class="btn-primary btn-block" id="create-btn">إنشاء المناسبة</button>
+      </div>
+
+      <div class="card" id="upload-card" style="display:none;">
+        <h2>📤 رفع الدعوات للمناسبة: <span id="upload-ev-name"></span></h2>
+        <p>يمكنك اختيار عدد كبير من الصور دفعة واحدة (10، 50، 100، 500...)</p>
+        <div class="file-input-wrap">
+          <input type="file" id="ev-files" accept="image/*" multiple>
+        </div>
+        <div class="progress-bar" id="upload-progress-wrap" style="display:none;">
+          <div class="progress-bar-fill" id="upload-progress-fill"></div>
+        </div>
+        <div id="upload-status" class="muted-small"></div>
+        <button class="btn-success btn-block" id="upload-btn" style="margin-top:10px;">رفع الدعوات</button>
+      </div>
+
+      <div class="card">
+        <h2>📋 المناسبات الحالية</h2>
+        <div id="events-list"><div class="center-screen"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
+  `;
+
+  document.getElementById("logout-btn").onclick = async ()=>{
+    await sb.auth.signOut();
+    renderAdminEntry();
+  };
+
+  document.getElementById("create-btn").onclick = createEvent;
+
+  loadEventsList();
+}
+
+let lastCreatedEventId = null;
+
+async function createEvent(){
+  const name = document.getElementById("ev-name").value.trim();
+  const description = document.getElementById("ev-desc").value.trim();
+  const event_date = document.getElementById("ev-date").value || null;
+  const event_time = document.getElementById("ev-time").value || null;
+  const msgEl = document.getElementById("create-msg");
+  const btn = document.getElementById("create-btn");
+
+  if(!name){
+    msgEl.innerHTML = msgHtml("error", "الرجاء إدخال اسم المناسبة");
+    return;
+  }
+  btn.disabled = true; btn.innerText = "جارِ الإنشاء...";
+
+  const { data, error } = await sb.from("events")
+    .insert({ name, description, event_date, event_time })
+    .select()
+    .single();
+
+  btn.disabled = false; btn.innerText = "إنشاء المناسبة";
+
+  if(error){
+    msgEl.innerHTML = msgHtml("error", "حدث خطأ أثناء إنشاء المناسبة: " + error.message);
+    return;
+  }
+
+  msgEl.innerHTML = msgHtml("success", "تم إنشاء المناسبة بنجاح! يمكنك الآن رفع الدعوات.");
+  document.getElementById("ev-name").value = "";
+  document.getElementById("ev-desc").value = "";
+  document.getElementById("ev-date").value = "";
+  document.getElementById("ev-time").value = "";
+
+  lastCreatedEventId = data.id;
+  document.getElementById("upload-ev-name").innerText = data.name;
+  document.getElementById("upload-card").style.display = "block";
+  document.getElementById("upload-btn").onclick = ()=>uploadInvitations(data.id);
+
+  loadEventsList();
+}
+
+async function uploadInvitations(eventId){
+  const filesInput = document.getElementById("ev-files");
+  const files = Array.from(filesInput.files || []);
+  const statusEl = document.getElementById("upload-status");
+  const progressWrap = document.getElementById("upload-progress-wrap");
+  const progressFill = document.getElementById("upload-progress-fill");
+  const btn = document.getElementById("upload-btn");
+
+  if(files.length === 0){
+    statusEl.innerHTML = msgHtml("error", "الرجاء اختيار صور الدعوات أولاً");
+    return;
+  }
+
+  btn.disabled = true;
+  progressWrap.style.display = "block";
+  let done = 0;
+  let failed = 0;
+
+  // رفع بتزامن محدود (4 ملفات في نفس الوقت) لتفادي إبطاء المتصفح مع مئات الصور
+  const CONCURRENCY = 4;
+  let index = 0;
+
+  async function worker(){
+    while(index < files.length){
+      const i = index++;
+      const file = files[i];
+      const path = `${eventId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+      try{
+        const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file, { upsert:false });
+        if(upErr) throw upErr;
+        const { data: pub } = sb.storage.from(BUCKET).getPublicUrl(path);
+        const { error: insErr } = await sb.from("invitations").insert({
+          event_id: eventId,
+          image_url: pub.publicUrl,
+          storage_path: path
+        });
+        if(insErr) throw insErr;
+      }catch(e){
+        failed++;
+      }
+      done++;
+      const pct = Math.round((done/files.length)*100);
+      progressFill.style.width = pct + "%";
+      statusEl.innerText = `تم رفع ${done} من ${files.length}${failed ? " (فشل: " + failed + ")" : ""}`;
+    }
+  }
+
+  const workers = Array.from({length: Math.min(CONCURRENCY, files.length)}, worker);
+  await Promise.all(workers);
+
+  btn.disabled = false;
+  statusEl.innerHTML = msgHtml("success", `اكتمل الرفع: ${files.length - failed} دعوة تم رفعها بنجاح${failed ? " (فشل " + failed + ")" : ""}`);
+  filesInput.value = "";
+  loadEventsList();
+}
+
+async function loadEventsList(){
+  const listEl = document.getElementById("events-list");
+  const { data: events, error } = await sb.from("events")
+    .select("*")
+    .order("created_at", { ascending:false });
+
+  if(error){
+    listEl.innerHTML = msgHtml("error", "تعذر تحميل المناسبات: " + error.message);
+    return;
+  }
+  if(!events || events.length === 0){
+    listEl.innerHTML = `<p>لا توجد مناسبات بعد.</p>`;
+    return;
+  }
+
+  // جلب عدد الدعوات المستخدمة/الكلي لكل مناسبة
+  const { data: invRows } = await sb.from("invitations").select("event_id, is_used");
+  const counts = {};
+  (invRows||[]).forEach(r=>{
+    counts[r.event_id] = counts[r.event_id] || {total:0, used:0};
+    counts[r.event_id].total++;
+    if(r.is_used) counts[r.event_id].used++;
+  });
+
+  listEl.innerHTML = events.map(ev=>{
+    const c = counts[ev.id] || {total:0, used:0};
+    const guestLink = `${baseUrl()}?guest=${ev.guest_token}`;
+    const statsLink = `${baseUrl()}?stats=${ev.stats_token}`;
+    return `
+      <div class="event-list-item">
+        <h3>${esc(ev.name)}</h3>
+        <p class="muted-small">${ev.event_date ? fmtDate(ev.event_date) : ""} ${ev.event_time ? " - " + esc(ev.event_time) : ""}</p>
+        <span class="badge badge-purple">إجمالي الدعوات: ${c.total}</span>
+        <span class="badge badge-green">مستخدمة: ${c.used}</span>
+        <span class="badge badge-red">متبقية: ${c.total - c.used}</span>
+        <div style="margin-top:10px;">
+          <label>رابط الضيوف</label>
+          <div class="link-box">
+            <input type="text" readonly value="${guestLink}">
+            <button class="btn-outline" onclick="copyText('${guestLink}', this)">نسخ</button>
+          </div>
+          <label>رابط الإحصائيات</label>
+          <div class="link-box">
+            <input type="text" readonly value="${statsLink}">
+            <button class="btn-outline" onclick="copyText('${statsLink}', this)">نسخ</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+/* ==========================================================
+   2) صفحة الضيوف
+   ========================================================== */
+async function renderGuestPage(token){
+  app.innerHTML = `<div class="center-screen"><div class="spinner"></div><p>جارِ تحميل المناسبة...</p></div>`;
+
+  const { data, error } = await sb.rpc("get_event_by_guest_token", { p_token: token });
+
+  if(error || !data || !data.success){
+    app.innerHTML = `<div class="center-screen">
+        <h2>⚠️ رابط غير صالح</h2>
+        <p>تعذر العثور على هذه المناسبة. الرجاء التأكد من الرابط.</p>
+      </div>`;
+    return;
+  }
+
+  const soldOut = data.remaining <= 0;
+
+  app.innerHTML = `
+    <div class="center-wrap">
+      <div class="card" style="text-align:center;">
+        <h1>${esc(data.name)}</h1>
+        ${data.description ? `<p>${esc(data.description)}</p>` : ""}
+        ${data.event_date ? `<p>📅 ${fmtDate(data.event_date)} ${data.event_time ? " الساعة " + esc(data.event_time) : ""}</p>` : ""}
+      </div>
+
+      <div id="guest-content" class="card"></div>
+    </div>
+    <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
+  `;
+
+  const content = document.getElementById("guest-content");
+
+  if(soldOut){
+    content.innerHTML = `
+      <div style="text-align:center;">
+        <h2>عذرًا، تم اكتمال العدد وإغلاق التسجيل.</h2>
+        <p>إذا كنت قد سجّلت مسبقًا، يمكنك استرجاع دعوتك هنا:</p>
+        <label>رقم الجوال</label>
+        <input type="tel" id="check-phone" placeholder="05xxxxxxxx">
+        <button class="btn-outline btn-block" id="check-btn">عرض دعوتي السابقة</button>
+        <div id="check-msg"></div>
+      </div>`;
+    document.getElementById("check-btn").onclick = async ()=>{
+      const phone = document.getElementById("check-phone").value.trim();
+      const msgEl = document.getElementById("check-msg");
+      if(!/^0[0-9]{9}$/.test(phone)){
+        msgEl.innerHTML = msgHtml("error", "رقم الجوال يجب أن يبدأ بـ 0 ويتكون من 10 أرقام");
+        return;
+      }
+      const { data: res } = await sb.rpc("check_existing_invitation", { p_guest_token: token, p_phone: phone });
+      if(res && res.success){
+        showInvitationResult(content, res.name, res.image_url, false);
+      } else {
+        msgEl.innerHTML = msgHtml("error", "لم يتم العثور على دعوة مرتبطة بهذا الرقم");
+      }
+    };
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="row">
+      <button class="btn-primary" id="confirm-open-btn">✅ تأكيد الحضور</button>
+      <button class="btn-danger" id="decline-btn">🙏 اعتذار</button>
+    </div>
+    <div id="guest-form-area"></div>
+  `;
+
+  document.getElementById("confirm-open-btn").onclick = ()=>{
+    document.getElementById("guest-form-area").innerHTML = `
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+      <label>الاسم</label>
+      <input type="text" id="guest-name" placeholder="اسمك الكامل">
+      <label>رقم الجوال</label>
+      <input type="tel" id="guest-phone" placeholder="05xxxxxxxx">
+      <div id="confirm-msg"></div>
+      <button class="btn-success btn-block" id="submit-confirm-btn">تأكيد</button>
+    `;
+    document.getElementById("submit-confirm-btn").onclick = async ()=>{
+      const name = document.getElementById("guest-name").value.trim();
+      const phone = document.getElementById("guest-phone").value.trim();
+      const msgEl = document.getElementById("confirm-msg");
+      const btn = document.getElementById("submit-confirm-btn");
+
+      if(name.length < 2){
+        msgEl.innerHTML = msgHtml("error", "الرجاء إدخال الاسم كاملاً");
+        return;
+      }
+      if(!/^0[0-9]{9}$/.test(phone)){
+        msgEl.innerHTML = msgHtml("error", "رقم الجوال يجب أن يبدأ بـ 0 ويتكون من 10 أرقام");
+        return;
+      }
+      btn.disabled = true; btn.innerText = "جارِ التأكيد...";
+      const { data: res, error: rpcErr } = await sb.rpc("confirm_attendance", {
+        p_guest_token: token, p_name: name, p_phone: phone
+      });
+      btn.disabled = false; btn.innerText = "تأكيد";
+
+      if(rpcErr || !res){
+        msgEl.innerHTML = msgHtml("error", "حدث خطأ، الرجاء المحاولة مرة أخرى");
+        return;
+      }
+      if(!res.success){
+        if(res.error === "sold_out"){
+          msgEl.innerHTML = msgHtml("error", "عذرًا، تم اكتمال العدد وإغلاق التسجيل.");
+        } else {
+          msgEl.innerHTML = msgHtml("error", "تعذر إتمام العملية، حاول مجددًا");
+        }
+        return;
+      }
+      showInvitationResult(content, res.name, res.image_url, res.already_registered);
+    };
+  };
+
+  document.getElementById("decline-btn").onclick = async ()=>{
+    const btn = document.getElementById("decline-btn");
+    btn.disabled = true;
+    const { data: res } = await sb.rpc("decline_attendance", { p_guest_token: token });
+    if(res && res.success){
+      content.innerHTML = `
+        <div style="text-align:center;">
+          <h2>نتشرف بكم في مناسبة اخرى</h2>
+        </div>`;
+    } else {
+      btn.disabled = false;
+      content.innerHTML += msgHtml("error", "حدث خطأ، الرجاء المحاولة مرة أخرى");
+    }
+  };
+}
+
+function showInvitationResult(container, name, imageUrl, alreadyRegistered){
+  container.innerHTML = `
+    <div style="text-align:center;">
+      <h2>${alreadyRegistered ? "أهلاً بعودتك، " : "تم تأكيد الحضور، أهلاً بك "} ${esc(name)} 🎉</h2>
+      <p>هذه دعوتك الخاصة:</p>
+      <img class="invite-img" src="${imageUrl}" alt="دعوة">
+    </div>`;
+}
+
+/* ==========================================================
+   3) صفحة الإحصائيات
+   ========================================================== */
+async function renderStatsPage(token){
+  app.innerHTML = `<div class="center-screen"><div class="spinner"></div><p>جارِ تحميل الإحصائيات...</p></div>`;
+
+  const { data, error } = await sb.rpc("get_event_stats", { p_stats_token: token });
+
+  if(error || !data || !data.success){
+    app.innerHTML = `<div class="center-screen">
+        <h2>⚠️ رابط غير صالح</h2>
+        <p>تعذر العثور على إحصائيات هذه المناسبة.</p>
+      </div>`;
+    return;
+  }
+
+  const guestsRows = (data.guests || []).map(g=>`
+    <tr>
+      <td>${esc(g.name)}</td>
+      <td>${esc(g.phone)}</td>
+      <td><a href="${g.image_url}" target="_blank">عرض الدعوة</a></td>
+    </tr>`).join("");
+
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="card">
+        <h1>${esc(data.name)}</h1>
+        ${data.description ? `<p>${esc(data.description)}</p>` : ""}
+        ${data.event_date ? `<p>📅 ${fmtDate(data.event_date)} ${data.event_time ? " الساعة " + esc(data.event_time) : ""}</p>` : ""}
+      </div>
+
+      <div class="card">
+        <div class="stats-grid">
+          <div class="stat-box"><div class="num">${data.total}</div><div class="lbl">إجمالي الدعوات</div></div>
+          <div class="stat-box"><div class="num">${data.used}</div><div class="lbl">دعوات مستخدمة</div></div>
+          <div class="stat-box"><div class="num">${data.remaining}</div><div class="lbl">دعوات متبقية</div></div>
+          <div class="stat-box"><div class="num">${data.confirmed_count}</div><div class="lbl">المؤكدون</div></div>
+          <div class="stat-box"><div class="num">${data.declined_count}</div><div class="lbl">المعتذرون</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>قائمة الضيوف المؤكدين</h2>
+        ${data.guests && data.guests.length ? `
+          <table>
+            <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th></tr></thead>
+            <tbody>${guestsRows}</tbody>
+          </table>` : `<p>لا يوجد ضيوف مؤكدون بعد.</p>`}
+      </div>
+    </div>
+    <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
+  `;
+}
+
+/* ---------------- تشغيل التطبيق ---------------- */
+router();
+</script>
+</body>
+</html>
