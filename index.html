@@ -96,6 +96,13 @@
   }
   .event-list-item{border-bottom:1px solid var(--border);padding:14px 0;}
   .event-list-item:last-child{border-bottom:none;}
+  .event-summary{cursor:pointer;list-style:none;}
+  .event-summary::-webkit-details-marker{display:none;}
+  .event-summary-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .event-summary-arrow{color:var(--primary);font-weight:700;transition:transform .15s ease;flex-shrink:0;}
+  details[open] .event-summary-arrow{transform:rotate(90deg);}
+  .event-summary-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .event-details{padding-top:14px;margin-top:12px;border-top:1px dashed var(--border);}
   .muted-small{font-size:.8rem;color:var(--muted);}
   .spinner{
     width:34px;height:34px;border:4px solid #ede9fe;border-top-color:var(--primary);
@@ -371,6 +378,7 @@ async function uploadInvitations(eventId){
 
 let allEventsCache = [];
 let allCountsCache = {};
+let allDeclineCountsCache = {};
 
 async function loadEventsList(){
   const listEl = document.getElementById("events-list");
@@ -404,6 +412,15 @@ async function loadEventsList(){
     if(r.is_used) allCountsCache[r.event_id].used++;
   });
 
+  // جلب عدد المعتذرين لكل مناسبة
+  const { data: declineRows } = await sb.from("declines")
+    .select("event_id")
+    .in("event_id", allEventsCache.map(e => e.id));
+  allDeclineCountsCache = {};
+  (declineRows||[]).forEach(r=>{
+    allDeclineCountsCache[r.event_id] = (allDeclineCountsCache[r.event_id] || 0) + 1;
+  });
+
   renderEventsList(document.getElementById("event-search")?.value || "");
 }
 
@@ -425,16 +442,27 @@ function renderEventsList(filterText){
 
   listEl.innerHTML = filtered.map(ev=>{
     const c = allCountsCache[ev.id] || {total:0, used:0};
+    const declined = allDeclineCountsCache[ev.id] || 0;
     const guestLink = `${baseUrl()}?guest=${ev.guest_token}`;
     const statsLink = `${baseUrl()}?stats=${ev.stats_token}`;
     return `
-      <div class="event-list-item">
-        <h3>${esc(ev.name)}</h3>
-        <p class="muted-small">${ev.event_date ? fmtDate(ev.event_date) : ""} ${ev.event_time ? " - " + esc(ev.event_time) : ""}</p>
-        <span class="badge badge-purple">إجمالي الدعوات: ${c.total}</span>
-        <span class="badge badge-green">مستخدمة: ${c.used}</span>
-        <span class="badge badge-red">متبقية: ${c.total - c.used}</span>
-        <div style="margin-top:10px;">
+      <details class="event-list-item">
+        <summary class="event-summary">
+          <div class="event-summary-head">
+            <div>
+              <h3>${esc(ev.name)}</h3>
+              <p class="muted-small">${ev.event_date ? fmtDate(ev.event_date) : ""} ${ev.event_time ? " - " + esc(ev.event_time) : ""}</p>
+            </div>
+            <span class="event-summary-arrow">›</span>
+          </div>
+          <div class="event-summary-badges">
+            <span class="badge badge-purple">الدعوات: ${c.total}</span>
+            <span class="badge badge-green">المؤكدون: ${c.used}</span>
+            <span class="badge badge-red">المعتذرون: ${declined}</span>
+            <span class="badge badge-purple">المتبقي: ${c.total - c.used}</span>
+          </div>
+        </summary>
+        <div class="event-details">
           <label>رابط الضيوف</label>
           <div class="link-box">
             <input type="text" readonly value="${guestLink}">
@@ -445,9 +473,9 @@ function renderEventsList(filterText){
             <input type="text" readonly value="${statsLink}">
             <button class="btn-outline" onclick="copyText('${statsLink}', this)">نسخ</button>
           </div>
+          <button class="btn-danger" style="margin-top:10px;" onclick="deleteEvent('${ev.id}')">🗑️ حذف المناسبة</button>
         </div>
-        <button class="btn-danger" style="margin-top:10px;" onclick="deleteEvent('${ev.id}')">🗑️ حذف المناسبة</button>
-      </div>`;
+      </details>`;
   }).join("");
 }
 
@@ -589,19 +617,45 @@ async function renderGuestPage(token){
     };
   };
 
-  document.getElementById("decline-btn").onclick = async ()=>{
-    const btn = document.getElementById("decline-btn");
-    btn.disabled = true;
-    const { data: res } = await sb.rpc("decline_attendance", { p_guest_token: token });
-    if(res && res.success){
+  document.getElementById("decline-btn").onclick = ()=>{
+    document.getElementById("guest-form-area").innerHTML = `
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+      <label>الاسم</label>
+      <input type="text" id="decline-name" placeholder="اسمك الكامل">
+      <label>رقم الجوال</label>
+      <input type="tel" id="decline-phone" placeholder="05xxxxxxxx">
+      <div id="decline-msg"></div>
+      <button class="btn-danger btn-block" id="submit-decline-btn">تأكيد الاعتذار</button>
+    `;
+    document.getElementById("submit-decline-btn").onclick = async ()=>{
+      const name = document.getElementById("decline-name").value.trim();
+      const phone = document.getElementById("decline-phone").value.trim();
+      const msgEl = document.getElementById("decline-msg");
+      const btn = document.getElementById("submit-decline-btn");
+
+      if(name.length < 2){
+        msgEl.innerHTML = msgHtml("error", "الرجاء إدخال الاسم كاملاً");
+        return;
+      }
+      if(!/^0[0-9]{9}$/.test(phone)){
+        msgEl.innerHTML = msgHtml("error", "رقم الجوال يجب أن يبدأ بـ 0 ويتكون من 10 أرقام");
+        return;
+      }
+      btn.disabled = true; btn.innerText = "جارِ الإرسال...";
+      const { data: res, error: rpcErr } = await sb.rpc("decline_attendance", {
+        p_guest_token: token, p_name: name, p_phone: phone
+      });
+      btn.disabled = false; btn.innerText = "تأكيد الاعتذار";
+
+      if(rpcErr || !res || !res.success){
+        msgEl.innerHTML = msgHtml("error", "حدث خطأ، الرجاء المحاولة مرة أخرى");
+        return;
+      }
       content.innerHTML = `
         <div style="text-align:center;">
           <h2>نتشرف بكم في مناسبة اخرى</h2>
         </div>`;
-    } else {
-      btn.disabled = false;
-      content.innerHTML += msgHtml("error", "حدث خطأ، الرجاء المحاولة مرة أخرى");
-    }
+    };
   };
 }
 
@@ -609,7 +663,8 @@ function showInvitationResult(container, name, imageUrl, alreadyRegistered){
   container.innerHTML = `
     <div style="text-align:center;">
       <h2>${alreadyRegistered ? "أهلاً بعودتك، " : "تم تأكيد الحضور، أهلاً بك "} ${esc(name)} 🎉</h2>
-      <p>هذه دعوتك الخاصة:</p>
+      <p style="font-weight:600;margin-bottom:6px;">هذا باركود الدخول الخاص بك، يرجى حفظه وإبرازه قبل الدخول.</p>
+      <p class="muted-small" style="margin-bottom:14px;">لحفظ الباركود اضغط ضغطًا مطولًا على الصورة ثم اختر حفظ الصورة، أو قم بالتقاط شاشة للاحتفاظ بها.</p>
       <img class="invite-img" src="${imageUrl}" alt="دعوة">
     </div>`;
 }
@@ -637,6 +692,12 @@ async function renderStatsPage(token){
       <td><a href="${g.image_url}" target="_blank">عرض الدعوة</a></td>
     </tr>`).join("");
 
+  const declinesRows = (data.declines || []).map(d=>`
+    <tr>
+      <td>${esc(d.name)}</td>
+      <td>${esc(d.phone)}</td>
+    </tr>`).join("");
+
   app.innerHTML = `
     <div class="wrap">
       <div class="card">
@@ -662,6 +723,15 @@ async function renderStatsPage(token){
             <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th></tr></thead>
             <tbody>${guestsRows}</tbody>
           </table>` : `<p>لا يوجد ضيوف مؤكدون بعد.</p>`}
+      </div>
+
+      <div class="card">
+        <h2>قائمة المعتذرين</h2>
+        ${data.declines && data.declines.length ? `
+          <table>
+            <thead><tr><th>الاسم</th><th>رقم الجوال</th></tr></thead>
+            <tbody>${declinesRows}</tbody>
+          </table>` : `<p>لا يوجد معتذرون بعد.</p>`}
       </div>
     </div>
     <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
