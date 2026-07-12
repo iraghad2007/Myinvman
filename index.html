@@ -446,7 +446,7 @@ function renderEventsList(filterText){
     const guestLink = `${baseUrl()}?guest=${ev.guest_token}`;
     const statsLink = `${baseUrl()}?stats=${ev.stats_token}`;
     return `
-      <details class="event-list-item">
+      <details class="event-list-item" data-event-id="${ev.id}">
         <summary class="event-summary">
           <div class="event-summary-head">
             <div>
@@ -456,10 +456,10 @@ function renderEventsList(filterText){
             <span class="event-summary-arrow">›</span>
           </div>
           <div class="event-summary-badges">
-            <span class="badge badge-purple">الدعوات: ${c.total}</span>
+            <span class="badge badge-purple" data-badge="total">الدعوات: ${c.total}</span>
             <span class="badge badge-green">المؤكدون: ${c.used}</span>
             <span class="badge badge-red">المعتذرون: ${declined}</span>
-            <span class="badge badge-purple">المتبقي: ${c.total - c.used}</span>
+            <span class="badge badge-purple" data-badge="remaining">المتبقي: ${c.total - c.used}</span>
           </div>
         </summary>
         <div class="event-details">
@@ -473,6 +473,8 @@ function renderEventsList(filterText){
             <input type="text" readonly value="${statsLink}">
             <button class="btn-outline" onclick="copyText('${statsLink}', this)">نسخ</button>
           </div>
+          <button class="btn-outline btn-block" style="margin-top:10px;" onclick="toggleAddInvitations('${ev.id}')">➕ إضافة دعوات جديدة</button>
+          <div id="add-inv-area-${ev.id}"></div>
           <button class="btn-danger" style="margin-top:10px;" onclick="deleteEvent('${ev.id}')">🗑️ حذف المناسبة</button>
         </div>
       </details>`;
@@ -501,6 +503,101 @@ async function deleteEvent(eventId){
 
   allEventsCache = allEventsCache.filter(e => e.id !== eventId);
   renderEventsList(document.getElementById("event-search")?.value || "");
+}
+
+function toggleAddInvitations(eventId){
+  const area = document.getElementById(`add-inv-area-${eventId}`);
+  if(area.innerHTML.trim() !== ""){
+    area.innerHTML = "";
+    return;
+  }
+  area.innerHTML = `
+    <div class="file-input-wrap" style="margin-top:10px;">
+      <input type="file" id="add-inv-files-${eventId}" accept="image/*" multiple>
+    </div>
+    <div class="progress-bar" id="add-inv-progress-wrap-${eventId}" style="display:none;">
+      <div class="progress-bar-fill" id="add-inv-progress-fill-${eventId}"></div>
+    </div>
+    <div id="add-inv-status-${eventId}" class="muted-small"></div>
+    <button class="btn-success btn-block" style="margin-top:8px;" id="add-inv-submit-${eventId}">رفع الدعوات الإضافية</button>
+  `;
+  document.getElementById(`add-inv-submit-${eventId}`).onclick = ()=>addInvitationsToEvent(eventId);
+}
+
+async function addInvitationsToEvent(eventId){
+  const filesInput = document.getElementById(`add-inv-files-${eventId}`);
+  const files = Array.from(filesInput.files || []);
+  const statusEl = document.getElementById(`add-inv-status-${eventId}`);
+  const progressWrap = document.getElementById(`add-inv-progress-wrap-${eventId}`);
+  const progressFill = document.getElementById(`add-inv-progress-fill-${eventId}`);
+  const btn = document.getElementById(`add-inv-submit-${eventId}`);
+
+  if(files.length === 0){
+    statusEl.innerHTML = msgHtml("error", "الرجاء اختيار صور الدعوات أولاً");
+    return;
+  }
+
+  btn.disabled = true;
+  progressWrap.style.display = "block";
+  let done = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  const CONCURRENCY = 4;
+  let index = 0;
+
+  async function worker(){
+    while(index < files.length){
+      const i = index++;
+      const file = files[i];
+      const path = `${eventId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+      try{
+        const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file, { upsert:false });
+        if(upErr) throw upErr;
+        const { data: pub } = sb.storage.from(BUCKET).getPublicUrl(path);
+        const { error: insErr } = await sb.from("invitations").insert({
+          event_id: eventId,
+          image_url: pub.publicUrl,
+          storage_path: path
+        });
+        if(insErr) throw insErr;
+        succeeded++;
+      }catch(e){
+        console.error(e);
+        alert(
+          e?.message ||
+          e?.error_description ||
+          JSON.stringify(e)
+        );
+        failed++;
+      }
+      done++;
+      const pct = Math.round((done/files.length)*100);
+      progressFill.style.width = pct + "%";
+      statusEl.innerText = `تم رفع ${done} من ${files.length}${failed ? " (فشل: " + failed + ")" : ""}`;
+    }
+  }
+
+  const workers = Array.from({length: Math.min(CONCURRENCY, files.length)}, worker);
+  await Promise.all(workers);
+
+  btn.disabled = false;
+  statusEl.innerHTML = msgHtml("success", `تمت إضافة ${succeeded} دعوة جديدة إلى نفس المناسبة${failed ? " (فشل " + failed + ")" : ""}`);
+  filesInput.value = "";
+
+  // تحديث العداد فورًا دون طي البطاقة أو إعادة تحميل القائمة
+  if(succeeded > 0){
+    allCountsCache[eventId] = allCountsCache[eventId] || {total:0, used:0};
+    allCountsCache[eventId].total += succeeded;
+    const detailsEl = document.querySelector(`details[data-event-id="${eventId}"]`);
+    if(detailsEl){
+      const c = allCountsCache[eventId];
+      const totalBadge = detailsEl.querySelector('[data-badge="total"]');
+      const remainingBadge = detailsEl.querySelector('[data-badge="remaining"]');
+      if(totalBadge) totalBadge.innerText = `الدعوات: ${c.total}`;
+      if(remainingBadge) remainingBadge.innerText = `المتبقي: ${c.total - c.used}`;
+    }
+  }
 }
 
 /* ==========================================================
