@@ -245,6 +245,7 @@ async function renderAdminDashboard(){
 
       <div class="card">
         <h2>📋 المناسبات الحالية</h2>
+        <input type="text" id="event-search" placeholder="ابحث باسم المناسبة...">
         <div id="events-list"><div class="center-screen"><div class="spinner"></div></div></div>
       </div>
     </div>
@@ -257,6 +258,7 @@ async function renderAdminDashboard(){
   };
 
   document.getElementById("create-btn").onclick = createEvent;
+  document.getElementById("event-search").oninput = (e)=> renderEventsList(e.target.value);
 
   loadEventsList();
 }
@@ -343,6 +345,12 @@ async function uploadInvitations(eventId){
         });
         if(insErr) throw insErr;
       }catch(e){
+        console.error(e);
+        alert(
+          e?.message ||
+          e?.error_description ||
+          JSON.stringify(e)
+        );
         failed++;
       }
       done++;
@@ -361,6 +369,9 @@ async function uploadInvitations(eventId){
   loadEventsList();
 }
 
+let allEventsCache = [];
+let allCountsCache = {};
+
 async function loadEventsList(){
   const listEl = document.getElementById("events-list");
   const { data: { user } } = await sb.auth.getUser();
@@ -374,7 +385,10 @@ async function loadEventsList(){
     listEl.innerHTML = msgHtml("error", "تعذر تحميل المناسبات: " + error.message);
     return;
   }
-  if(!events || events.length === 0){
+
+  allEventsCache = events || [];
+
+  if(allEventsCache.length === 0){
     listEl.innerHTML = `<p>لا توجد مناسبات بعد.</p>`;
     return;
   }
@@ -382,16 +396,35 @@ async function loadEventsList(){
   // جلب عدد الدعوات المستخدمة/الكلي لمناسبات هذا الأدمن فقط
   const { data: invRows } = await sb.from("invitations")
     .select("event_id, is_used")
-    .in("event_id", events.map(e => e.id));
-  const counts = {};
+    .in("event_id", allEventsCache.map(e => e.id));
+  allCountsCache = {};
   (invRows||[]).forEach(r=>{
-    counts[r.event_id] = counts[r.event_id] || {total:0, used:0};
-    counts[r.event_id].total++;
-    if(r.is_used) counts[r.event_id].used++;
+    allCountsCache[r.event_id] = allCountsCache[r.event_id] || {total:0, used:0};
+    allCountsCache[r.event_id].total++;
+    if(r.is_used) allCountsCache[r.event_id].used++;
   });
 
-  listEl.innerHTML = events.map(ev=>{
-    const c = counts[ev.id] || {total:0, used:0};
+  renderEventsList(document.getElementById("event-search")?.value || "");
+}
+
+function renderEventsList(filterText){
+  const listEl = document.getElementById("events-list");
+  const q = (filterText || "").trim().toLowerCase();
+  const filtered = q
+    ? allEventsCache.filter(ev => ev.name.toLowerCase().includes(q))
+    : allEventsCache;
+
+  if(allEventsCache.length === 0){
+    listEl.innerHTML = `<p>لا توجد مناسبات بعد.</p>`;
+    return;
+  }
+  if(filtered.length === 0){
+    listEl.innerHTML = `<p>لا توجد نتائج مطابقة.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(ev=>{
+    const c = allCountsCache[ev.id] || {total:0, used:0};
     const guestLink = `${baseUrl()}?guest=${ev.guest_token}`;
     const statsLink = `${baseUrl()}?stats=${ev.stats_token}`;
     return `
@@ -413,8 +446,33 @@ async function loadEventsList(){
             <button class="btn-outline" onclick="copyText('${statsLink}', this)">نسخ</button>
           </div>
         </div>
+        <button class="btn-danger" style="margin-top:10px;" onclick="deleteEvent('${ev.id}')">🗑️ حذف المناسبة</button>
       </div>`;
   }).join("");
+}
+
+async function deleteEvent(eventId){
+  const ev = allEventsCache.find(e => e.id === eventId);
+  const evName = ev ? ev.name : "";
+  if(!confirm(`هل أنت متأكد من حذف المناسبة "${evName}" نهائيًا؟ سيتم حذف جميع الدعوات والضيوف المرتبطين بها ولا يمكن التراجع عن هذا الإجراء.`)) return;
+
+  // حذف صور الدعوات من Storage أولاً
+  const { data: invRows } = await sb.from("invitations").select("storage_path").eq("event_id", eventId);
+  const paths = (invRows || []).map(r => r.storage_path).filter(Boolean);
+  if(paths.length){
+    const { error: removeErr } = await sb.storage.from(BUCKET).remove(paths);
+    if(removeErr) console.error(removeErr);
+  }
+
+  // حذف المناسبة (يحذف تلقائيًا الدعوات والضيوف المرتبطين عبر ON DELETE CASCADE)
+  const { error } = await sb.from("events").delete().eq("id", eventId);
+  if(error){
+    alert("تعذر حذف المناسبة: " + error.message);
+    return;
+  }
+
+  allEventsCache = allEventsCache.filter(e => e.id !== eventId);
+  renderEventsList(document.getElementById("event-search")?.value || "");
 }
 
 /* ==========================================================
