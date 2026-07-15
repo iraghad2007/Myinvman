@@ -838,8 +838,7 @@ function renderWhatsAppRecipients(eventId){
   listEl.innerHTML = recipients.map(r => `
     <div class="link-box" data-wa-phone="${eventId}-${r.phone}" style="justify-content:space-between;flex-wrap:wrap;">
       <span>${esc(r.phone)}</span>
-      <span data-wa-status style="font-weight:600;">${r.status === 'sent' ? '✅ تم الإرسال' : '🟡 لم يُرسل بعد'}</span>
-      ${r.status !== 'sent' ? `<button class="btn-success" data-wa-send onclick="sendWhatsAppMessage('${eventId}','${r.phone}')">إرسال</button>` : ""}
+      <button class="${r.status === 'sent' ? 'btn-outline' : 'btn-success'}" data-wa-send onclick="sendWhatsAppMessage('${eventId}','${r.phone}')">${r.status === 'sent' ? '✅ تم الإرسال' : 'إرسال'}</button>
     </div>
   `).join("");
 }
