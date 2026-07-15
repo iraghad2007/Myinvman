@@ -214,54 +214,67 @@ async function renderAdminDashboard(){
     <div class="wrap">
       <div class="header">
         <div class="brand">🎟️ لوحة تحكم الدعوات</div>
-        <button class="btn-outline" id="logout-btn">تسجيل الخروج</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-outline" id="whatsapp-nav-btn">📨 إدارة الإرسال</button>
+          <button class="btn-outline" id="logout-btn">تسجيل الخروج</button>
+        </div>
       </div>
 
-      <div class="card">
-        <h2>➕ إنشاء مناسبة جديدة</h2>
-        <div id="create-msg"></div>
-        <label>اسم المناسبة</label>
-        <input type="text" id="ev-name" placeholder="مثال: حفل زفاف سارة">
-        <label>وصف المناسبة</label>
-        <textarea id="ev-desc" placeholder="نص ترحيبي مختصر يظهر للضيوف"></textarea>
-        <div class="row">
-          <div>
-            <label>تاريخ المناسبة</label>
-            <input type="date" id="ev-date">
+      <div id="main-dashboard-content">
+        <div class="card">
+          <h2>➕ إنشاء مناسبة جديدة</h2>
+          <div id="create-msg"></div>
+          <label>اسم المناسبة</label>
+          <input type="text" id="ev-name" placeholder="مثال: حفل زفاف سارة">
+          <label>وصف المناسبة</label>
+          <textarea id="ev-desc" placeholder="نص ترحيبي مختصر يظهر للضيوف"></textarea>
+          <div class="row">
+            <div>
+              <label>تاريخ المناسبة</label>
+              <input type="date" id="ev-date">
+            </div>
+            <div>
+              <label>وقت المناسبة</label>
+              <input type="time" id="ev-time">
+            </div>
           </div>
-          <div>
-            <label>وقت المناسبة</label>
-            <input type="time" id="ev-time">
+          <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;">
+            <input type="checkbox" id="ev-phone-restrict" onchange="document.getElementById('ev-phone-list-area').style.display=this.checked?'':'none';">
+            تقييد التسجيل بأرقام جوالات محددة
+          </label>
+          <div id="ev-phone-list-area" style="display:none;">
+            <label>أرقام الجوالات المسموح بها (رقم في كل سطر)</label>
+            <textarea id="ev-phone-list" placeholder="0501111111&#10;0502222222&#10;0503333333" style="min-height:120px;"></textarea>
           </div>
+          <button class="btn-primary btn-block" id="create-btn">إنشاء المناسبة</button>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;">
-          <input type="checkbox" id="ev-phone-restrict" onchange="document.getElementById('ev-phone-list-area').style.display=this.checked?'':'none';">
-          تقييد التسجيل بأرقام جوالات محددة
-        </label>
-        <div id="ev-phone-list-area" style="display:none;">
-          <label>أرقام الجوالات المسموح بها (رقم في كل سطر)</label>
-          <textarea id="ev-phone-list" placeholder="0501111111&#10;0502222222&#10;0503333333" style="min-height:120px;"></textarea>
+
+        <div class="card" id="upload-card" style="display:none;">
+          <h2>📤 رفع الدعوات للمناسبة: <span id="upload-ev-name"></span></h2>
+          <p>يمكنك اختيار عدد كبير من الصور دفعة واحدة (10، 50، 100، 500...)</p>
+          <div class="file-input-wrap">
+            <input type="file" id="ev-files" accept="image/*" multiple>
+          </div>
+          <div class="progress-bar" id="upload-progress-wrap" style="display:none;">
+            <div class="progress-bar-fill" id="upload-progress-fill"></div>
+          </div>
+          <div id="upload-status" class="muted-small"></div>
+          <button class="btn-success btn-block" id="upload-btn" style="margin-top:10px;">رفع الدعوات</button>
         </div>
-        <button class="btn-primary btn-block" id="create-btn">إنشاء المناسبة</button>
+
+        <div class="card">
+          <h2>📋 المناسبات الحالية</h2>
+          <input type="text" id="event-search" placeholder="ابحث باسم المناسبة...">
+          <div id="events-list"><div class="center-screen"><div class="spinner"></div></div></div>
+        </div>
       </div>
 
-      <div class="card" id="upload-card" style="display:none;">
-        <h2>📤 رفع الدعوات للمناسبة: <span id="upload-ev-name"></span></h2>
-        <p>يمكنك اختيار عدد كبير من الصور دفعة واحدة (10، 50، 100، 500...)</p>
-        <div class="file-input-wrap">
-          <input type="file" id="ev-files" accept="image/*" multiple>
+      <div id="whatsapp-manager-content" style="display:none;">
+        <div class="card">
+          <h2>📨 إدارة الإرسال عبر واتساب</h2>
+          <p>اضغط على اسم أي مناسبة لعرض رسالتها وأرقامها وإرسال الدعوات.</p>
+          <div id="whatsapp-events-list"><div class="center-screen"><div class="spinner"></div></div></div>
         </div>
-        <div class="progress-bar" id="upload-progress-wrap" style="display:none;">
-          <div class="progress-bar-fill" id="upload-progress-fill"></div>
-        </div>
-        <div id="upload-status" class="muted-small"></div>
-        <button class="btn-success btn-block" id="upload-btn" style="margin-top:10px;">رفع الدعوات</button>
-      </div>
-
-      <div class="card">
-        <h2>📋 المناسبات الحالية</h2>
-        <input type="text" id="event-search" placeholder="ابحث باسم المناسبة...">
-        <div id="events-list"><div class="center-screen"><div class="spinner"></div></div></div>
       </div>
     </div>
     <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
@@ -274,6 +287,22 @@ async function renderAdminDashboard(){
 
   document.getElementById("create-btn").onclick = createEvent;
   document.getElementById("event-search").oninput = (e)=> renderEventsList(e.target.value);
+
+  document.getElementById("whatsapp-nav-btn").onclick = ()=>{
+    const main = document.getElementById("main-dashboard-content");
+    const wa = document.getElementById("whatsapp-manager-content");
+    const btn = document.getElementById("whatsapp-nav-btn");
+    if(wa.style.display === "none"){
+      main.style.display = "none";
+      wa.style.display = "block";
+      btn.innerText = "🏠 الرئيسية";
+      loadWhatsAppManager();
+    } else {
+      main.style.display = "";
+      wa.style.display = "none";
+      btn.innerText = "📨 إدارة الإرسال";
+    }
+  };
 
   loadEventsList();
 }
@@ -411,6 +440,7 @@ let allEventsCache = [];
 let allCountsCache = {};
 let allDeclineCountsCache = {};
 let allPhoneCountsCache = {};
+let waRecipientsCache = {};
 
 async function loadEventsList(){
   const listEl = document.getElementById("events-list");
@@ -733,6 +763,179 @@ async function savePhoneList(eventId){
   msgEl.innerHTML = msgHtml("success", `تم حفظ القائمة (${uniquePhones.length} رقم)`);
 }
 
+/* ---------------- إدارة الإرسال عبر واتساب ---------------- */
+
+function loadWhatsAppManager(){
+  const listEl = document.getElementById("whatsapp-events-list");
+  if(!allEventsCache || allEventsCache.length === 0){
+    listEl.innerHTML = `<p>لا توجد مناسبات بعد.</p>`;
+    return;
+  }
+  listEl.innerHTML = allEventsCache.map(ev => `
+    <details class="event-list-item" data-wa-event-id="${ev.id}" ontoggle="onWhatsAppFolderToggle(this,'${ev.id}')">
+      <summary class="event-summary">
+        <div class="event-summary-head">
+          <div><h3>📁 ${esc(ev.name)}</h3></div>
+          <span class="event-summary-arrow">›</span>
+        </div>
+      </summary>
+      <div class="event-details" id="wa-details-${ev.id}"></div>
+    </details>
+  `).join("");
+}
+
+function onWhatsAppFolderToggle(detailsEl, eventId){
+  if(detailsEl.open){
+    loadWhatsAppEventDetails(eventId);
+  }
+}
+
+async function loadWhatsAppEventDetails(eventId){
+  const container = document.getElementById(`wa-details-${eventId}`);
+  container.innerHTML = `<div class="center-screen"><div class="spinner"></div></div>`;
+  const ev = allEventsCache.find(e => e.id === eventId);
+
+  const { data: recipients, error } = await sb.from("whatsapp_recipients")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending:true });
+
+  if(error){
+    container.innerHTML = msgHtml("error", "تعذر تحميل بيانات الإرسال: " + error.message);
+    return;
+  }
+
+  waRecipientsCache[eventId] = recipients || [];
+
+  container.innerHTML = `
+    <div class="stats-grid" id="wa-stats-${eventId}"></div>
+
+    <label>رسالة واتساب الخاصة بهذه المناسبة</label>
+    <textarea id="wa-message-${eventId}" style="min-height:120px;" placeholder="السلام عليكم ورحمة الله وبركاته، يسعدنا دعوتكم لحضور مناسبتنا...">${esc(ev?.whatsapp_message || "")}</textarea>
+    <button class="btn-primary btn-block" onclick="saveWhatsAppMessage('${eventId}')">حفظ الرسالة</button>
+    <div id="wa-message-msg-${eventId}"></div>
+
+    <label style="margin-top:14px;">إضافة أرقام جوال (رقم في كل سطر)</label>
+    <textarea id="wa-phone-input-${eventId}" style="min-height:120px;" placeholder="0501111111&#10;0502222222&#10;0503333333"></textarea>
+    <button class="btn-primary btn-block" onclick="saveWhatsAppNumbers('${eventId}')">حفظ الأرقام</button>
+    <div id="wa-numbers-msg-${eventId}"></div>
+
+    <div id="wa-recipients-list-${eventId}" style="margin-top:14px;"></div>
+  `;
+
+  renderWhatsAppRecipients(eventId);
+  updateWhatsAppStatsSummary(eventId);
+}
+
+function renderWhatsAppRecipients(eventId){
+  const listEl = document.getElementById(`wa-recipients-list-${eventId}`);
+  if(!listEl) return;
+  const recipients = waRecipientsCache[eventId] || [];
+  if(recipients.length === 0){
+    listEl.innerHTML = `<p class="muted-small">لا توجد أرقام مضافة بعد.</p>`;
+    return;
+  }
+  listEl.innerHTML = recipients.map(r => `
+    <div class="link-box" data-wa-phone="${eventId}-${r.phone}" style="justify-content:space-between;flex-wrap:wrap;">
+      <span>${esc(r.phone)}</span>
+      <span data-wa-status style="font-weight:600;">${r.status === 'sent' ? '✅ تم الإرسال' : '🟡 لم يُرسل بعد'}</span>
+      ${r.status !== 'sent' ? `<button class="btn-success" data-wa-send onclick="sendWhatsAppMessage('${eventId}','${r.phone}')">إرسال</button>` : ""}
+    </div>
+  `).join("");
+}
+
+function updateWhatsAppStatsSummary(eventId){
+  const el = document.getElementById(`wa-stats-${eventId}`);
+  if(!el) return;
+  const recipients = waRecipientsCache[eventId] || [];
+  const total = recipients.length;
+  const sent = recipients.filter(r => r.status === 'sent').length;
+  el.innerHTML = `
+    <div class="stat-box"><div class="num">${total}</div><div class="lbl">عدد الأرقام</div></div>
+    <div class="stat-box"><div class="num">${sent}</div><div class="lbl">تم الإرسال</div></div>
+    <div class="stat-box"><div class="num">${total - sent}</div><div class="lbl">لم يتم الإرسال</div></div>
+  `;
+}
+
+async function saveWhatsAppMessage(eventId){
+  const textarea = document.getElementById(`wa-message-${eventId}`);
+  const msgEl = document.getElementById(`wa-message-msg-${eventId}`);
+  const message = textarea.value;
+
+  const { error } = await sb.from("events").update({ whatsapp_message: message }).eq("id", eventId);
+  if(error){
+    msgEl.innerHTML = msgHtml("error", "تعذر حفظ الرسالة: " + error.message);
+    return;
+  }
+
+  const ev = allEventsCache.find(e => e.id === eventId);
+  if(ev) ev.whatsapp_message = message;
+
+  msgEl.innerHTML = msgHtml("success", "تم حفظ الرسالة");
+}
+
+async function saveWhatsAppNumbers(eventId){
+  const textarea = document.getElementById(`wa-phone-input-${eventId}`);
+  const msgEl = document.getElementById(`wa-numbers-msg-${eventId}`);
+  const lines = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
+  const invalid = lines.filter(l => !/^0[0-9]{9}$/.test(l));
+
+  if(invalid.length){
+    msgEl.innerHTML = msgHtml("error", `أرقام غير صحيحة (يجب أن تبدأ بـ 0 وتتكون من 10 أرقام): ${invalid.slice(0,5).join("، ")}${invalid.length>5 ? " ..." : ""}`);
+    return;
+  }
+
+  const uniquePhones = [...new Set(lines)];
+  if(uniquePhones.length === 0){
+    msgEl.innerHTML = msgHtml("error", "الرجاء لصق رقم واحد على الأقل");
+    return;
+  }
+
+  const rows = uniquePhones.map(phone => ({ event_id: eventId, phone }));
+  const { error } = await sb.from("whatsapp_recipients")
+    .upsert(rows, { onConflict: "event_id,phone", ignoreDuplicates: true });
+
+  if(error){
+    msgEl.innerHTML = msgHtml("error", "تعذر حفظ الأرقام: " + error.message);
+    return;
+  }
+
+  textarea.value = "";
+  msgEl.innerHTML = msgHtml("success", "تم حفظ الأرقام");
+
+  const { data: recipients } = await sb.from("whatsapp_recipients")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending:true });
+  waRecipientsCache[eventId] = recipients || [];
+  renderWhatsAppRecipients(eventId);
+  updateWhatsAppStatsSummary(eventId);
+}
+
+async function sendWhatsAppMessage(eventId, phone){
+  const ev = allEventsCache.find(e => e.id === eventId);
+  const message = (ev && ev.whatsapp_message) || "";
+  const waNumber = "966" + phone.substring(1);
+  const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
+
+  const nowIso = new Date().toISOString();
+  const { error } = await sb.from("whatsapp_recipients")
+    .update({ status: "sent", sent_at: nowIso, message })
+    .eq("event_id", eventId)
+    .eq("phone", phone);
+
+  if(error){
+    console.error(error);
+    return;
+  }
+
+  const rec = (waRecipientsCache[eventId]||[]).find(r => r.phone === phone);
+  if(rec){ rec.status = "sent"; rec.sent_at = nowIso; }
+  renderWhatsAppRecipients(eventId);
+  updateWhatsAppStatsSummary(eventId);
+}
+
 /* ==========================================================
    2) صفحة الضيوف
    ========================================================== */
@@ -795,8 +998,8 @@ async function renderGuestPage(token){
 
   content.innerHTML = `
     <div class="row">
-      <button class="btn-primary" id="confirm-open-btn">تأكيد الحضور</button>
-      <button class="btn-danger" id="decline-btn">اعتذار</button>
+      <button class="btn-primary" id="confirm-open-btn">✅ تأكيد الحضور</button>
+      <button class="btn-danger" id="decline-btn">🙏 اعتذار</button>
     </div>
     <div id="guest-form-area"></div>
   `;
@@ -917,11 +1120,18 @@ async function renderStatsPage(token){
     return;
   }
 
+  function waStatusLabel(status){
+    if(status === "sent") return "✅ تم الإرسال";
+    if(status === "pending") return "⏳ لم يُرسل بعد";
+    return "—";
+  }
+
   const guestsRows = (data.guests || []).map(g=>`
     <tr>
       <td>${esc(g.name)}</td>
       <td>${esc(g.phone)}</td>
       <td><a href="${g.image_url}" target="_blank">عرض الدعوة</a></td>
+      <td>${waStatusLabel(g.whatsapp_status)}</td>
     </tr>`).join("");
 
   const declinesRows = (data.declines || []).map(d=>`
@@ -952,7 +1162,7 @@ async function renderStatsPage(token){
         <h2>قائمة الضيوف المؤكدين</h2>
         ${data.guests && data.guests.length ? `
           <table>
-            <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th></tr></thead>
+            <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th><th>حالة الإرسال</th></tr></thead>
             <tbody>${guestsRows}</tbody>
           </table>` : `<p>لا يوجد ضيوف مؤكدون بعد.</p>`}
       </div>
