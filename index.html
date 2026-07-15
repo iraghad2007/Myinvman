@@ -1119,24 +1119,23 @@ async function renderStatsPage(token){
     return;
   }
 
-  function waStatusLabel(status){
-    if(status === "sent") return "✅ تم الإرسال";
-    if(status === "pending") return "⏳ لم يُرسل بعد";
-    return "—";
-  }
-
   const guestsRows = (data.guests || []).map(g=>`
     <tr>
       <td>${esc(g.name)}</td>
       <td>${esc(g.phone)}</td>
       <td><a href="${g.image_url}" target="_blank">عرض الدعوة</a></td>
-      <td>${waStatusLabel(g.whatsapp_status)}</td>
     </tr>`).join("");
 
   const declinesRows = (data.declines || []).map(d=>`
     <tr>
       <td>${esc(d.name)}</td>
       <td>${esc(d.phone)}</td>
+    </tr>`).join("");
+
+  const whatsappRows = (data.whatsapp_recipients || []).map(w=>`
+    <tr>
+      <td>${esc(w.phone)}</td>
+      <td>${w.status === "sent" ? "✅ تم الإرسال" : "⏳ لم يُرسل بعد"}</td>
     </tr>`).join("");
 
   app.innerHTML = `
@@ -1161,7 +1160,7 @@ async function renderStatsPage(token){
         <h2>قائمة الضيوف المؤكدين</h2>
         ${data.guests && data.guests.length ? `
           <table>
-            <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th><th>حالة الإرسال</th></tr></thead>
+            <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th></tr></thead>
             <tbody>${guestsRows}</tbody>
           </table>` : `<p>لا يوجد ضيوف مؤكدون بعد.</p>`}
       </div>
@@ -1173,6 +1172,15 @@ async function renderStatsPage(token){
             <thead><tr><th>الاسم</th><th>رقم الجوال</th></tr></thead>
             <tbody>${declinesRows}</tbody>
           </table>` : `<p>لا يوجد معتذرون بعد.</p>`}
+      </div>
+
+      <div class="card">
+        <h2>حالة إرسال الدعوات عبر واتساب</h2>
+        ${data.whatsapp_recipients && data.whatsapp_recipients.length ? `
+          <table>
+            <thead><tr><th>رقم الجوال</th><th>حالة الإرسال</th></tr></thead>
+            <tbody>${whatsappRows}</tbody>
+          </table>` : `<p>لا توجد أرقام مضافة للإرسال بعد.</p>`}
       </div>
     </div>
     <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
