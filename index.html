@@ -239,6 +239,10 @@ async function renderAdminDashboard(){
             </div>
           </div>
           <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;">
+            <input type="checkbox" id="ev-requires-invitations" checked>
+            هذه المناسبة تحتاج دعوات
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;">
             <input type="checkbox" id="ev-phone-restrict" onchange="document.getElementById('ev-phone-list-area').style.display=this.checked?'':'none';">
             تقييد التسجيل بأرقام جوالات محددة
           </label>
@@ -314,6 +318,7 @@ async function createEvent(){
   const description = document.getElementById("ev-desc").value.trim();
   const event_date = document.getElementById("ev-date").value || null;
   const event_time = document.getElementById("ev-time").value || null;
+  const requiresInvitations = document.getElementById("ev-requires-invitations").checked;
   const phoneRestrict = document.getElementById("ev-phone-restrict").checked;
   const phoneListRaw = document.getElementById("ev-phone-list").value;
   const msgEl = document.getElementById("create-msg");
@@ -340,7 +345,7 @@ async function createEvent(){
   const { data: { user } } = await sb.auth.getUser();
 
   const { data, error } = await sb.from("events")
-    .insert({ name, description, event_date, event_time, owner_id: user.id, phone_restriction_enabled: phoneRestrict })
+    .insert({ name, description, event_date, event_time, owner_id: user.id, phone_restriction_enabled: phoneRestrict, requires_invitations: requiresInvitations })
     .select()
     .single();
 
@@ -357,19 +362,22 @@ async function createEvent(){
     if(phoneErr) console.error(phoneErr);
   }
 
-  msgEl.innerHTML = msgHtml("success", "تم إنشاء المناسبة بنجاح! يمكنك الآن رفع الدعوات.");
+  msgEl.innerHTML = msgHtml("success", requiresInvitations ? "تم إنشاء المناسبة بنجاح! يمكنك الآن رفع الدعوات." : "تم إنشاء المناسبة بنجاح! هذه مناسبة بدون دعوات (تأكيد حضور فقط).");
   document.getElementById("ev-name").value = "";
   document.getElementById("ev-desc").value = "";
   document.getElementById("ev-date").value = "";
   document.getElementById("ev-time").value = "";
+  document.getElementById("ev-requires-invitations").checked = true;
   document.getElementById("ev-phone-restrict").checked = false;
   document.getElementById("ev-phone-list").value = "";
   document.getElementById("ev-phone-list-area").style.display = "none";
 
-  lastCreatedEventId = data.id;
-  document.getElementById("upload-ev-name").innerText = data.name;
-  document.getElementById("upload-card").style.display = "block";
-  document.getElementById("upload-btn").onclick = ()=>uploadInvitations(data.id);
+  if(requiresInvitations){
+    lastCreatedEventId = data.id;
+    document.getElementById("upload-ev-name").innerText = data.name;
+    document.getElementById("upload-card").style.display = "block";
+    document.getElementById("upload-btn").onclick = ()=>uploadInvitations(data.id);
+  }
 
   loadEventsList();
 }
@@ -441,6 +449,7 @@ let allCountsCache = {};
 let allDeclineCountsCache = {};
 let allPhoneCountsCache = {};
 let waRecipientsCache = {};
+let allConfirmedCountsCache = {};
 
 async function loadEventsList(){
   const listEl = document.getElementById("events-list");
@@ -472,6 +481,15 @@ async function loadEventsList(){
     allCountsCache[r.event_id] = allCountsCache[r.event_id] || {total:0, used:0};
     allCountsCache[r.event_id].total++;
     if(r.is_used) allCountsCache[r.event_id].used++;
+  });
+
+  // جلب عدد المؤكدين الفعلي لكل مناسبة (يعمل للمناسبات بدون دعوات أيضًا)
+  const { data: guestRows } = await sb.from("guests")
+    .select("event_id")
+    .in("event_id", allEventsCache.map(e => e.id));
+  allConfirmedCountsCache = {};
+  (guestRows||[]).forEach(r=>{
+    allConfirmedCountsCache[r.event_id] = (allConfirmedCountsCache[r.event_id] || 0) + 1;
   });
 
   // جلب عدد المعتذرين لكل مناسبة
@@ -513,10 +531,25 @@ function renderEventsList(filterText){
 
   listEl.innerHTML = filtered.map(ev=>{
     const c = allCountsCache[ev.id] || {total:0, used:0};
+    const confirmedCount = allConfirmedCountsCache[ev.id] || 0;
     const declined = allDeclineCountsCache[ev.id] || 0;
     const phoneCount = allPhoneCountsCache[ev.id] || 0;
     const guestLink = `${baseUrl()}?guest=${ev.guest_token}`;
     const statsLink = `${baseUrl()}?stats=${ev.stats_token}`;
+    const badgesHtml = ev.requires_invitations ? `
+            <span class="badge badge-purple" data-badge="total">الدعوات: ${c.total}</span>
+            <span class="badge badge-green">المؤكدون: ${confirmedCount}</span>
+            <span class="badge badge-red">المعتذرون: ${declined}</span>
+            <span class="badge badge-purple" data-badge="remaining">المتبقي: ${c.total - c.used}</span>
+          ` : `
+            <span class="badge badge-green">المؤكدون: ${confirmedCount}</span>
+            <span class="badge badge-red">المعتذرون: ${declined}</span>
+            <span class="badge badge-purple">🎫 بدون دعوات (تأكيد حضور فقط)</span>
+          `;
+    const addInvitationsHtml = ev.requires_invitations ? `
+          <button class="btn-outline btn-block" style="margin-top:10px;" onclick="toggleAddInvitations('${ev.id}')">➕ إضافة دعوات جديدة</button>
+          <div id="add-inv-area-${ev.id}"></div>
+` : "";
     return `
       <details class="event-list-item" data-event-id="${ev.id}" ontoggle="onEventDetailsToggle(this,'${ev.id}')">
         <summary class="event-summary">
@@ -527,12 +560,7 @@ function renderEventsList(filterText){
             </div>
             <span class="event-summary-arrow">›</span>
           </div>
-          <div class="event-summary-badges">
-            <span class="badge badge-purple" data-badge="total">الدعوات: ${c.total}</span>
-            <span class="badge badge-green">المؤكدون: ${c.used}</span>
-            <span class="badge badge-red">المعتذرون: ${declined}</span>
-            <span class="badge badge-purple" data-badge="remaining">المتبقي: ${c.total - c.used}</span>
-          </div>
+          <div class="event-summary-badges">${badgesHtml}</div>
         </summary>
         <div class="event-details">
           <label>رابط الضيوف</label>
@@ -545,9 +573,7 @@ function renderEventsList(filterText){
             <input type="text" readonly value="${statsLink}">
             <button class="btn-outline" onclick="copyText('${statsLink}', this)">نسخ</button>
           </div>
-          <button class="btn-outline btn-block" style="margin-top:10px;" onclick="toggleAddInvitations('${ev.id}')">➕ إضافة دعوات جديدة</button>
-          <div id="add-inv-area-${ev.id}"></div>
-
+${addInvitationsHtml}
           <div style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
               <input type="checkbox" id="phone-restrict-toggle-${ev.id}" ${ev.phone_restriction_enabled ? "checked" : ""} onchange="onPhoneRestrictionToggle('${ev.id}', this.checked)">
@@ -951,7 +977,7 @@ async function renderGuestPage(token){
     return;
   }
 
-  const soldOut = data.remaining <= 0;
+  const soldOut = data.requires_invitations && data.remaining <= 0;
 
   app.innerHTML = `
     <div class="center-wrap">
@@ -1047,7 +1073,11 @@ async function renderGuestPage(token){
         }
         return;
       }
-      showInvitationResult(content, res.name, res.image_url, res.already_registered);
+      if(res.requires_invitations === false){
+        showAttendanceOnlyResult(content, res.name, res.already_registered);
+      } else {
+        showInvitationResult(content, res.name, res.image_url, res.already_registered);
+      }
     };
   };
 
@@ -1103,6 +1133,14 @@ function showInvitationResult(container, name, imageUrl, alreadyRegistered){
     </div>`;
 }
 
+function showAttendanceOnlyResult(container, name, alreadyRegistered){
+  container.innerHTML = `
+    <div style="text-align:center;">
+      <h2>${alreadyRegistered ? "أهلاً بعودتك، " : ""} ${esc(name)} 🎉</h2>
+      <p style="font-weight:600;">تم تسجيل تأكيد حضوركم بنجاح</p>
+    </div>`;
+}
+
 /* ==========================================================
    3) صفحة الإحصائيات
    ========================================================== */
@@ -1119,11 +1157,15 @@ async function renderStatsPage(token){
     return;
   }
 
-  const guestsRows = (data.guests || []).map(g=>`
+  const guestsRows = (data.guests || []).map(g=> data.requires_invitations ? `
     <tr>
       <td>${esc(g.name)}</td>
       <td>${esc(g.phone)}</td>
-      <td><a href="${g.image_url}" target="_blank">عرض الدعوة</a></td>
+      <td>${g.image_url ? `<a href="${g.image_url}" target="_blank">عرض الدعوة</a>` : "—"}</td>
+    </tr>` : `
+    <tr>
+      <td>${esc(g.name)}</td>
+      <td>${esc(g.phone)}</td>
     </tr>`).join("");
 
   const declinesRows = (data.declines || []).map(d=>`
@@ -1148,9 +1190,11 @@ async function renderStatsPage(token){
 
       <div class="card">
         <div class="stats-grid">
+          ${data.requires_invitations ? `
           <div class="stat-box"><div class="num">${data.total}</div><div class="lbl">إجمالي الدعوات</div></div>
           <div class="stat-box"><div class="num">${data.used}</div><div class="lbl">دعوات مستخدمة</div></div>
           <div class="stat-box"><div class="num">${data.remaining}</div><div class="lbl">دعوات متبقية</div></div>
+          ` : ""}
           <div class="stat-box"><div class="num">${data.confirmed_count}</div><div class="lbl">المؤكدون</div></div>
           <div class="stat-box"><div class="num">${data.declined_count}</div><div class="lbl">المعتذرون</div></div>
         </div>
@@ -1160,7 +1204,7 @@ async function renderStatsPage(token){
         <h2>قائمة الضيوف المؤكدين</h2>
         ${data.guests && data.guests.length ? `
           <table>
-            <thead><tr><th>الاسم</th><th>رقم الجوال</th><th>الدعوة</th></tr></thead>
+            <thead><tr><th>الاسم</th><th>رقم الجوال</th>${data.requires_invitations ? "<th>الدعوة</th>" : ""}</tr></thead>
             <tbody>${guestsRows}</tbody>
           </table>` : `<p>لا يوجد ضيوف مؤكدون بعد.</p>`}
       </div>
@@ -1174,14 +1218,15 @@ async function renderStatsPage(token){
           </table>` : `<p>لا يوجد معتذرون بعد.</p>`}
       </div>
 
+      ${data.whatsapp_recipients && data.whatsapp_recipients.length ? `
       <div class="card">
         <h2>حالة إرسال الدعوات عبر واتساب</h2>
-        ${data.whatsapp_recipients && data.whatsapp_recipients.length ? `
-          <table>
-            <thead><tr><th>رقم الجوال</th><th>حالة الإرسال</th></tr></thead>
-            <tbody>${whatsappRows}</tbody>
-          </table>` : `<p>لا توجد أرقام مضافة للإرسال بعد.</p>`}
+        <table>
+          <thead><tr><th>رقم الجوال</th><th>حالة الإرسال</th></tr></thead>
+          <tbody>${whatsappRows}</tbody>
+        </table>
       </div>
+      ` : ""}
     </div>
     <footer class="appfoot">نظام توزيع الدعوات الذكي</footer>
   `;
